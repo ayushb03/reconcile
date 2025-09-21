@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import {
   ArrowRight,
   Zap,
@@ -21,11 +23,18 @@ import {
   Lock,
   BarChart3,
   Globe,
+  X,
 } from "lucide-react"
 
 export default function ReconcileAIPage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [submitStatus, setSubmitStatus] = React.useState<'idle' | 'success' | 'error'>('idle');
+  const [isWaitlistModalOpen, setIsWaitlistModalOpen] = React.useState(false);
+  const [waitlistEmail, setWaitlistEmail] = React.useState('');
+  const [waitlistPainPoints, setWaitlistPainPoints] = React.useState('');
+  const [isWaitlistSubmitting, setIsWaitlistSubmitting] = React.useState(false);
+  const [waitlistStatus, setWaitlistStatus] = React.useState<'idle' | 'success' | 'error'>('idle');
+  const [waitlistError, setWaitlistError] = React.useState('');
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -68,6 +77,48 @@ export default function ReconcileAIPage() {
     }
   };
 
+  const handleWaitlistSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setIsWaitlistSubmitting(true);
+    setWaitlistStatus('idle');
+    setWaitlistError('');
+
+    try {
+      const response = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          email: waitlistEmail,
+          pain_points: waitlistPainPoints 
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setWaitlistStatus('success');
+        setWaitlistEmail('');
+        setWaitlistPainPoints('');
+        // Close modal after 2 seconds
+        setTimeout(() => {
+          setIsWaitlistModalOpen(false);
+          setWaitlistStatus('idle');
+        }, 2000);
+      } else {
+        setWaitlistStatus('error');
+        setWaitlistError(result.error || 'Something went wrong. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error joining waitlist:', error);
+      setWaitlistStatus('error');
+      setWaitlistError('Network error. Please check your connection and try again.');
+    } finally {
+      setIsWaitlistSubmitting(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Navigation */}
@@ -89,10 +140,17 @@ export default function ReconcileAIPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <Button variant="ghost" className="text-muted-foreground hover:text-foreground hover:bg-muted/50">
-                Sign In
+              <Button 
+                onClick={() => {
+                  setIsWaitlistModalOpen(true);
+                  setWaitlistError('');
+                  setWaitlistStatus('idle');
+                  setWaitlistPainPoints('');
+                }}
+                className="bg-primary hover:bg-primary/90 text-primary-foreground"
+              >
+                Join Waitlist
               </Button>
-              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">Start Free Trial</Button>
             </div>
           </div>
         </div>
@@ -625,6 +683,91 @@ export default function ReconcileAIPage() {
           </div>
         </div>
       </footer>
+
+      {/* Waitlist Modal */}
+      {isWaitlistModalOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-background border border-border rounded-lg p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-foreground">Join the Waitlist</h2>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsWaitlistModalOpen(false)}
+                className="h-8 w-8"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            
+            <p className="text-muted-foreground mb-6">
+              Be the first to know when ReconcileAI launches. Get early access and exclusive updates.
+            </p>
+
+            <form onSubmit={handleWaitlistSubmit} className="space-y-4">
+              <div>
+                <Label htmlFor="waitlist-email" className="text-sm font-medium">
+                  Email Address
+                </Label>
+                <Input
+                  id="waitlist-email"
+                  type="email"
+                  value={waitlistEmail}
+                  onChange={(e) => setWaitlistEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  required
+                  className="mt-1"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="waitlist-pain-points" className="text-sm font-medium">
+                  What do you want us to solve? <span className="text-muted-foreground">(Optional)</span>
+                </Label>
+                <textarea
+                  id="waitlist-pain-points"
+                  value={waitlistPainPoints}
+                  onChange={(e) => setWaitlistPainPoints(e.target.value)}
+                  placeholder="Tell us what you'd like us to solve for you..."
+                  rows={3}
+                  className="w-full px-3 py-2 mt-1 border border-border rounded-lg bg-background text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-colors resize-none"
+                />
+              </div>
+
+              {waitlistStatus === 'success' && (
+                <div className="flex items-center gap-2 text-green-600 text-sm">
+                  <CheckCircle className="h-4 w-4" />
+                  Successfully joined the waitlist!
+                </div>
+              )}
+
+              {waitlistStatus === 'error' && (
+                <div className="text-red-600 text-sm">
+                  {waitlistError || 'Something went wrong. Please try again.'}
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsWaitlistModalOpen(false)}
+                  className="flex-1"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={isWaitlistSubmitting}
+                  className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground"
+                >
+                  {isWaitlistSubmitting ? 'Joining...' : 'Join Waitlist'}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
